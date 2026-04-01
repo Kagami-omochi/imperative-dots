@@ -446,8 +446,12 @@ mkdir -p "$TARGET_FONTS_DIR"
 
 if [ -d "$REPO_FONTS_DIR" ]; then
     cp -r "$REPO_FONTS_DIR/"* "$TARGET_FONTS_DIR/" 2>/dev/null || true
+    # Fix permissions so fontconfig can actually read them
+    find "$TARGET_FONTS_DIR" -type f -exec chmod 644 {} \;
+    find "$TARGET_FONTS_DIR" -type d -exec chmod 755 {} \;
+    
     if command -v fc-cache &> /dev/null; then
-        fc-cache -f "$TARGET_FONTS_DIR"
+        fc-cache -rf "$TARGET_FONTS_DIR"
         printf "  -> Font cache updated %-21s ${C_GREEN}[ OK ]${RESET}\n" ""
     fi
 fi
@@ -491,6 +495,12 @@ if [ -f "$HYPR_CONF" ]; then
 
     # 4. Inject Environment Variables for Quickshell
     sed -i "/^env = NIXOS_OZONE_WL,1/a env = WALLPAPER_DIR,$WALLPAPER_DIR\nenv = SCRIPT_DIR,$HOME/.config/hypr/scripts" "$HYPR_CONF"
+
+    # 5. Fix Bezier Curve and Keyboard Layout (Arch Fixes)
+    # Inject the missing 'myBezier' definition right after 'animations {'
+    sed -i '/animations {/a \    bezier = myBezier, 0.05, 0.9, 0.1, 1.05' "$HYPR_CONF"
+    # Remove the space in the keyboard layout string
+    sed -i 's/kb_layout = us, ru/kb_layout = us,ru/' "$HYPR_CONF"
 else
     echo -e "${C_RED}Warning: hyprland.conf not found at $HYPR_CONF${RESET}"
 fi

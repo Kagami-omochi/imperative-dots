@@ -5,6 +5,12 @@ export ZSH="$HOME/.oh-my-zsh"
 ZSH_THEME="robbyrussell"
 ZSH_CUSTOM="$ZSH/custom"
 
+# Install Oh-My-Zsh if it doesn't exist
+if [ ! -d "$ZSH" ]; then
+  echo "Installing Oh-My-Zsh..."
+  git clone https://github.com/ohmyzsh/ohmyzsh.git "$ZSH" >/dev/null 2>&1
+fi
+
 # Auto-fetch necessary plugins if they don't exist
 if [ ! -d "$ZSH_CUSTOM/plugins/zsh-autosuggestions" ]; then
   echo "Installing zsh-autosuggestions..."

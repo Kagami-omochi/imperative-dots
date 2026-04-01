@@ -252,4 +252,34 @@ local function setup_server(server_name, config)
     pattern = final_config.filetypes,
     callback = function(args)
       local root_dir = final_config.root_dir
-      if type(root_dir) == 'function'
+      if type(root_dir) == 'function' then
+         -- Attached LSP specific functionality goes here
+      end
+    end
+  })
+  
+  require('lspconfig')[server_name].setup(final_config)
+end
+
+-- Initialize servers defined in NixOS config (lua-language-server, pyright, nil)
+setup_server("lua_ls", {
+  settings = {
+    Lua = {
+      diagnostics = {
+        globals = { "vim" }
+      }
+    }
+  }
+})
+
+setup_server("pyright")
+
+setup_server("nil_ls", {
+  settings = {
+    ['nil'] = {
+      formatting = {
+        command = { "nixpkgs-fmt" }
+      }
+    }
+  }
+})
