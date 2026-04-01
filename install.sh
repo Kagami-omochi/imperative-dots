@@ -242,8 +242,8 @@ set_weather_api() {
         if [[ -n "$input_city" ]]; then
             echo -e "Searching for '${input_city}'..."
             
-            # Safely encode the city string for URL usage
-            encoded_city=$(echo "$input_city" | jq -sRr @uri)
+            # Use echo -n to prevent jq from encoding a newline character which breaks the API call
+            encoded_city=$(echo -n "$input_city" | jq -sRr @uri)
             api_response=$(curl -s "http://api.openweathermap.org/data/2.5/find?q=${encoded_city}&appid=${WEATHER_API_KEY}")
             
             # Validate API Key & Response
@@ -523,15 +523,21 @@ REPO_FONTS_DIR="$REPO_DIR/.local/share/fonts"
 mkdir -p "$TARGET_FONTS_DIR"
 
 if [ -d "$REPO_FONTS_DIR" ]; then
-    # Using cp -a with /. ensures all files, folders, and hidden items are copied exactly
-    cp -a "$REPO_FONTS_DIR/." "$TARGET_FONTS_DIR/" 2>/dev/null || true
+    # Copy all files explicitly, ensuring deep directories are captured
+    cp -r "$REPO_FONTS_DIR/"* "$TARGET_FONTS_DIR/" 2>/dev/null || true
+    
+    # Explicit fallback copy for iosevka if it wasn't picked up properly
+    if [ -f "$REPO_FONTS_DIR/iosevka-nerd-font.ttf" ]; then
+        cp "$REPO_FONTS_DIR/iosevka-nerd-font.ttf" "$TARGET_FONTS_DIR/"
+    fi
     
     # Fix permissions so fontconfig can actually read them
     find "$TARGET_FONTS_DIR" -type f -exec chmod 644 {} \;
     find "$TARGET_FONTS_DIR" -type d -exec chmod 755 {} \;
     
     if command -v fc-cache &> /dev/null; then
-        fc-cache -rf "$TARGET_FONTS_DIR"
+        # Force cache update verbosely so we ensure the system registers it
+        fc-cache -f "$TARGET_FONTS_DIR" > /dev/null 2>&1
         printf "  -> Font cache updated %-21s ${C_GREEN}[ OK ]${RESET}\n" ""
     fi
 fi
@@ -561,50 +567,33 @@ DIARY_MGR="$TARGET_CONFIG_DIR/hypr/scripts/quickshell/calendar/diary_manager.sh"
 WP_DIR="$TARGET_CONFIG_DIR/hypr/scripts/quickshell/wallpaper"
 
 if [ -f "$HYPR_CONF" ]; then
-    # 1. Universal Monitor Setup
-    sed -i 's/^monitor = .*/monitor = ,preferred,auto,1/' "$HYPR_CONF"
-
-    # 2. Strip Personal App Keybindings
-    sed -i '/exec, firefox/d' "$HYPR_CONF"
-    sed -i '/exec, Telegram/d' "$HYPR_CONF"
-    sed -i '/exec, obsidian/d' "$HYPR_CONF"
-
-    # 3. Swap swww-daemon for awww daemon
-    sed -i 's/swww-daemon/awww-daemon/g' "$HYPR_CONF"
-
-    # 4. Inject SwayOSD Autostart (Looking for the new 'awww daemon' entry)
+    # 1. Inject SwayOSD Autostart (Looking for the new 'awww-daemon' entry)
     if [ "$INSTALL_SWAYOSD" = true ]; then
-        sed -i '/^exec-once = awww daemon/a exec-once = swayosd-server --top-margin 0.9 --style ~/.config/swayosd/style.css' "$HYPR_CONF"
+        sed -i '/^exec-once = awww-daemon/a exec-once = swayosd-server --top-margin 0.9 --style ~/.config/swayosd/style.css' "$HYPR_CONF"
     fi
 
-    # 5. Inject Environment Variables for Quickshell
+    # 2. Inject Environment Variables for Quickshell
     sed -i "/^env = NIXOS_OZONE_WL,1/a env = WALLPAPER_DIR,$WALLPAPER_DIR\nenv = SCRIPT_DIR,$HOME/.config/hypr/scripts" "$HYPR_CONF"
-
-    # 6. Fix Bezier Curve and Keyboard Layout (Arch Fixes)
-    # Inject the missing 'myBezier' definition right after 'animations {'
-    sed -i '/animations {/a \    bezier = myBezier, 0.05, 0.9, 0.1, 1.05' "$HYPR_CONF"
-    # Remove the space in the keyboard layout string
-    sed -i 's/kb_layout = us, ru/kb_layout = us,ru/' "$HYPR_CONF"
 else
     echo -e "${C_RED}Warning: hyprland.conf not found at $HYPR_CONF${RESET}"
 fi
 
-# 7. Patch WallpaperPicker.qml dynamically
+# 3. Patch WallpaperPicker.qml dynamically
 if [ -f "$WP_QML" ]; then
     sed -i 's|Quickshell.env("HOME") + "/Images/Wallpapers"|Quickshell.env("WALLPAPER_DIR")|g' "$WP_QML"
 fi
 
-# 8. Rename all instances of swww to awww in quickshell/wallpaper files
+# 4. Rename all instances of swww to awww in quickshell/wallpaper files
 if [ -d "$WP_DIR" ]; then
     find "$WP_DIR" -type f -exec sed -i 's/swww/awww/g' {} +
 fi
 
-# 9. Remove Personal Diary Manager
+# 5. Remove Personal Diary Manager
 if [ -f "$DIARY_MGR" ]; then
     rm -f "$DIARY_MGR"
 fi
 
-# 10. Zsh Dynamism
+# 6. Zsh Dynamism
 if [ -f "$ZSH_RC" ]; then
     echo -e "\n# Dynamic System Paths" >> "$ZSH_RC"
     echo "export WALLPAPER_DIR=\"$WALLPAPER_DIR\"" >> "$ZSH_RC"
@@ -612,7 +601,7 @@ if [ -f "$ZSH_RC" ]; then
     sed -i "s/OS_LOGO_PLACEHOLDER/${OS}_small/g" "$ZSH_RC"
 fi
 
-# 11. Remove Schedule Directory
+# 7. Remove Schedule Directory
 SCHEDULE_DIR="$TARGET_CONFIG_DIR/hypr/scripts/quickshell/calendar/schedule"
 if [ -d "$SCHEDULE_DIR" ]; then
     rm -rf "$SCHEDULE_DIR"

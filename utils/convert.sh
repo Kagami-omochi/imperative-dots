@@ -14,16 +14,6 @@ echo "Starting Dotfile Conversion Process..."
 echo "Using config: $CONFIG_FILE"
 echo "==========================================="
 
-# 1. Run the Hyprland/Hypridle configuration generator
-if [ -f "$SCRIPT_DIR/auto-scripts/hyprcfg.py" ]; then
-    echo "Running hyprcfg.py..."
-    python3 "$SCRIPT_DIR/auto-scripts/hyprcfg.py" --config "$CONFIG_FILE"
-else
-    echo "Warning: hyprcfg.py not found in $SCRIPT_DIR/auto-scripts/"
-fi
-
-echo "-------------------------------------------"
-
 # 2. Run the Scripts & Assets copier (Quickshell, bash scripts, etc.)
 if [ -f "$SCRIPT_DIR/auto-scripts/scriptscfg.py" ]; then
     echo "Running scriptscfg.py..."
