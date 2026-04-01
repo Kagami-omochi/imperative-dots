@@ -8,11 +8,9 @@ daily_cache_file="${cache_dir}/daily_weather_cache.json"
 next_day_cache_file="${cache_dir}/next_day_precache.json"
 
 # API Settings
-# Load environment variables
+# Load environment variables silently
 if [ -f "$(dirname "$0")/.env" ]; then
     export $(grep -v '^#' "$(dirname "$0")/.env" | xargs)
-else
-    echo ".env file not found!"
 fi
 
 # API Settings from .env

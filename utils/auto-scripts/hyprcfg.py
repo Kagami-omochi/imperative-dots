@@ -11,7 +11,7 @@ def get_credit_header():
 #    ██║██║   ╚████╔╝ ███████║██╔████╔██║██║██████╔╝██║   ██║
 #    ██║██║    ╚██╔╝  ██╔══██║██║╚██╔╝██║██║██╔══██╗██║   ██║
 #    ██║███████╗██║   ██║  ██║██║ ╚═╝ ██║██║██║  ██║╚██████╔╝
-#    ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝     ╚═╝╚═╝╚═╝  ╚═╝ ╚═════╝ 
+#    ╚═╝╚══════╝╚═╝   ╚═╝  ╚═╝╚═╝    ╚═╝╚═╝╚═╝  ╚═╝ ╚═════╝ 
 #
 #    Created by ilyamiro
 #    https://github.com/ilyamiro/nixos-configuration
@@ -48,9 +48,15 @@ def parse_nix_configs(nix_dir, output_dir):
 
     # Regex definitions for parsing Nix syntax
     re_env = re.compile(r'home\.sessionVariables\.([A-Z_]+)\s*=\s*"([^"]+)";')
+    
+    # Multi-line lists and dictionaries
     re_list_start_quote = re.compile(r'"([^"]+)"\s*=\s*\[')
     re_list_start = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*\[')
     re_dict_start = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*\{')
+    
+    # Single-line lists (fixes the bezier curve bug)
+    re_single_list_q = re.compile(r'"([^"]+)"\s*=\s*\[\s*"([^"]+)"\s*\];')
+    re_single_list = re.compile(r'([a-zA-Z0-9_]+)\s*=\s*\[\s*"([^"]+)"\s*\];')
     
     # Matching specific key-value pairs
     re_var_str = re.compile(r'"(\$[a-zA-Z0-9_]+)"\s*=\s*"([^"]+)";')
@@ -202,8 +208,25 @@ def parse_nix_configs(nix_dir, output_dir):
                     hyprland_sections[current_section].append(f"{indent}{key} {{")
                     dict_depth += 1
                     continue
+                
+                # Single-line list check (e.g., bezier = ["myBezier, 0.05, ..."];)
+                match_sl_q = re_single_list_q.search(line)
+                if match_sl_q:
+                    key, val = match_sl_q.groups()
+                    if dict_depth == 0:
+                        current_section = get_section_name(key)
+                    hyprland_sections[current_section].append(f"{indent}{key} = {val}")
+                    continue
+                
+                match_sl = re_single_list.search(line)
+                if match_sl:
+                    key, val = match_sl.groups()
+                    if dict_depth == 0:
+                        current_section = get_section_name(key)
+                    hyprland_sections[current_section].append(f"{indent}{key} = {val}")
+                    continue
 
-                # List start (e.g., bind = [ or "exec-once" = [ )
+                # Multi-line List start (e.g., bind = [ or "exec-once" = [ )
                 match_list_q = re_list_start_quote.search(line)
                 if match_list_q:
                     key = match_list_q.group(1)
