@@ -102,7 +102,7 @@ Rectangle {
         // Details & Input
         ColumnLayout {
             Layout.alignment: Qt.AlignVCenter
-            spacing: 16
+            spacing: 12
 
             Text {
                 text: userModel.lastUser || "User"
@@ -110,12 +110,35 @@ Rectangle {
                 font.pixelSize: 28
                 font.weight: Font.Bold
                 color: Colors.text
+                Layout.alignment: Qt.AlignLeft
+            }
+
+            // NEW: Minimal Session Switcher
+            ComboBox {
+                id: sessionMenu
+                Layout.alignment: Qt.AlignLeft
+                model: sessionModel
+                textRole: "name"
+                currentIndex: sessionModel.lastIndex
+                font.family: "JetBrains Mono"
+                font.pixelSize: 14
+                
+                // Keep it looking like plain text until clicked
+                background: Rectangle { color: "transparent" }
+                contentItem: Text {
+                    text: "󰧨  " + sessionMenu.currentText
+                    color: Colors.subtext0
+                    font: sessionMenu.font
+                    verticalAlignment: Text.AlignVCenter
+                }
             }
 
             Rectangle {
                 width: 280
                 height: 60
                 radius: 30
+                clip: true // FIX: Stops the visual overflow of the box
+                
                 color: Qt.rgba(Colors.surface0.r, Colors.surface0.g, Colors.surface0.b, 0.5)
                 border.width: 2
                 border.color: passwordField.focus ? Colors.text : Qt.rgba(Colors.text.r, Colors.text.g, Colors.text.b, 0.08)
@@ -127,6 +150,7 @@ Rectangle {
                     anchors.leftMargin: 20
                     anchors.rightMargin: 20
                     verticalAlignment: TextInput.AlignVCenter
+                    clip: true // FIX: Ensures the text itself is cut off at the margins
                     echoMode: TextInput.Password
                     font.family: "JetBrains Mono"
                     font.pixelSize: 24
@@ -135,14 +159,14 @@ Rectangle {
 
                     onAccepted: {
                         if (text !== "") {
-                            sddm.login(userModel.lastUser, text, sessionModel.lastIndex)
+                            // FIX: Now uses the selected session from the ComboBox above
+                            sddm.login(userModel.lastUser, text, sessionMenu.currentIndex)
                         }
                     }
                 }
             }
         }
     }
-
     // 4. POWER CONTROLS
     RowLayout {
         anchors.bottom: parent.bottom

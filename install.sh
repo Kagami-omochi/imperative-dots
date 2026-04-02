@@ -857,6 +857,7 @@ unzip -q /tmp/iosevka-pack/Iosevka.zip -d /tmp/iosevka-pack/
 printf "  -> Installing fonts to IosevkaNerdFont directory... \n"
 mkdir -p "$TARGET_FONTS_DIR/IosevkaNerdFont"
 mv /tmp/iosevka-pack/*.ttf "$TARGET_FONTS_DIR/IosevkaNerdFont/"
+sudo cp -r ~/.local/share/fonts/IosevkaNerdFont /usr/share/fonts/
 
 printf "  -> Cleaning up temporary files... \n"
 rm -rf /tmp/iosevka-pack
