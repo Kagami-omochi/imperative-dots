@@ -31,10 +31,11 @@ if [[ "$ACTION" =~ ^[0-9]+$ ]]; then
 
     TARGET_ADDR=$(hyprctl clients -j | jq -r ".[] | select(.workspace.id == $WORKSPACE_NUM and .class != \"qs-master\") | .address" | head -n 1)
 
+    # FIXED: Removed 'keyword cursor:no_warps' toggles to prevent Wayland pointer desync in Hyprland 0.54+
     if [[ -n "$TARGET_ADDR" && "$TARGET_ADDR" != "null" ]]; then
-        hyprctl --batch "dispatch $CMD ; keyword cursor:no_warps true ; dispatch focuswindow address:$TARGET_ADDR ; keyword cursor:no_warps false"
+        hyprctl --batch "dispatch $CMD ; dispatch focuswindow address:$TARGET_ADDR"
     else
-        hyprctl --batch "dispatch $CMD ; keyword cursor:no_warps true ; dispatch focuswindow qs-master ; keyword cursor:no_warps false"
+        hyprctl dispatch "$CMD"
     fi
 
     exit 0
@@ -162,10 +163,10 @@ save_and_focus_widget() {
         echo "$current_addr" > "$PREV_FOCUS_FILE"
     fi
 
-    # Dispatch focus without warping the cursor (run async with a tiny delay to allow QML to move the window first)
+    # Dispatch focus natively (run async with a tiny delay to allow QML to move the window first)
     (
         sleep 0.05
-        hyprctl --batch "keyword cursor:no_warps true ; dispatch focuswindow title:^qs-master$ ; keyword cursor:no_warps false" >/dev/null 2>&1
+        hyprctl dispatch focuswindow title:^qs-master$ >/dev/null 2>&1
     ) &
 }
 
@@ -173,8 +174,8 @@ restore_focus() {
     if [[ -f "$PREV_FOCUS_FILE" ]]; then
         local prev_addr=$(cat "$PREV_FOCUS_FILE")
         if [[ -n "$prev_addr" && "$prev_addr" != "null" ]]; then
-            # Restore focus to the previous window without warping the cursor
-            hyprctl --batch "keyword cursor:no_warps true ; dispatch focuswindow address:$prev_addr ; keyword cursor:no_warps false" >/dev/null 2>&1
+            # Restore focus natively to the previous window
+            hyprctl dispatch focuswindow address:$prev_addr >/dev/null 2>&1
         fi
         rm -f "$PREV_FOCUS_FILE"
     fi

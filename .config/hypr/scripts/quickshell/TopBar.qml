@@ -102,14 +102,14 @@ PanelWindow {
     // 1. The continuous background daemon
     Process {
         id: wsDaemon
-        command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/workspaces.sh > /tmp/qs_workspaces.json"]
+        command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/workspaces.sh"]
         running: true
     }
 
     // 2. The lightweight reader
     Process {
         id: wsReader
-        command: ["bash", "-c", "tail -n 1 /tmp/qs_workspaces.json 2>/dev/null"]
+        command: ["bash", "-c", "cat /tmp/qs_workspaces.json 2>/dev/null"]
         stdout: StdioCollector {
             onStreamFinished: {
                 let txt = this.text.trim();
@@ -223,14 +223,17 @@ PanelWindow {
                         barWindow.fastPollerLoaded = true;
                     } catch(e) {}
                 }
+                // When the system/music waiter finishes, instantly refresh the music state
+                musicForceRefresh.running = true; 
                 sysWaiter.running = true;
-                musicForceRefresh.running = true; // Instantly grab the fresh music data if triggered by DBus
             }
         }
     }
+    
     Process {
         id: sysWaiter
         command: ["bash", "-c", "~/.config/hypr/scripts/quickshell/sys_waiter.sh"]
+        onExited: sysPoller.running = true // Hard failsafe if stdout doesn't emit properly
         stdout: StdioCollector {
             onStreamFinished: sysPoller.running = true
         }

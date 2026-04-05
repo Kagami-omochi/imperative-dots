@@ -17,12 +17,14 @@ bluetoothctl scan off > /dev/null 2>&1
 SEQ_END=8
 
 print_workspaces() {
-    # Get raw data
-    spaces=$(hyprctl workspaces -j)
-    active=$(hyprctl activeworkspace -j | jq '.id')
+    # Get raw data with a timeout fallback
+    spaces=$(timeout 2 hyprctl workspaces -j 2>/dev/null)
+    active=$(timeout 2 hyprctl activeworkspace -j 2>/dev/null | jq '.id')
 
-    # Generate the JSON
-    # ADDED: --unbuffered so the file updates instantly for TopBar.qml
+    # Failsafe if hyprctl crashes to prevent jq from outputting errors
+    if [ -z "$spaces" ] || [ -z "$active" ]; then return; fi
+
+    # Generate the JSON and write it atomically to prevent UI flickering
     echo "$spaces" | jq --unbuffered --argjson a "$active" --arg end "$SEQ_END" -c '
         # Create a map of workspace ID -> workspace data for easy lookup
         (map( { (.id|tostring): . } ) | add) as $s
@@ -44,18 +46,23 @@ print_workspaces() {
                 tooltip: $win
             }
         )
-    '
+    ' > /tmp/qs_workspaces.tmp
+    
+    mv /tmp/qs_workspaces.tmp /tmp/qs_workspaces.json
 }
 
 # Print initial state
 print_workspaces
 
-# Listen to Hyprland socket
-# ADDED: focusedmon, activewindow, and destroyworkspace to perfectly sync all UI shifts
-socat -u UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock - | while read -r line; do
-    case "$line" in
-        workspace*|focusedmon*|activewindow*|createwindow*|closewindow*|movewindow*|destroyworkspace*)
-            print_workspaces
-            ;;
-    esac
+# Listen to Hyprland socket wrapped in an infinite loop
+# This ensures that if the socket crashes or restarts, the script recovers
+while true; do
+    socat -u UNIX-CONNECT:$XDG_RUNTIME_DIR/hypr/$HYPRLAND_INSTANCE_SIGNATURE/.socket2.sock - | while read -r line; do
+        case "$line" in
+            workspace*|focusedmon*|activewindow*|createwindow*|closewindow*|movewindow*|destroyworkspace*)
+                print_workspaces
+                ;;
+        esac
+    done
+    sleep 1
 done
