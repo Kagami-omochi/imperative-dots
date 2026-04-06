@@ -944,7 +944,6 @@ else
     printf "  -> Cleaning up temporary files... \n"
     rm -rf /tmp/iosevka-pack
     rm -f "$TARGET_FONTS_DIR/IosevkaNerdFont/"*Mono*.ttf
-    rm -f "$HOME/.cache/wallpaper_initialized" # if reinstalling
 fi
 
 # Fix permissions so fontconfig can actually read them
@@ -969,6 +968,7 @@ fi
 printf "  -> Preferences saved to user_prefs.conf ${C_GREEN}[ OK ]${RESET}\n"
 
 # --- 7. Adaptability Phase ---
+rm -f "$HOME/.cache/wallpaper_initialized" # if reinstalling
 echo -e "\n${C_CYAN}[ INFO ]${RESET} Adapting configurations to your specific system..."
 
 HYPR_CONF="$TARGET_CONFIG_DIR/hypr/hyprland.conf"
