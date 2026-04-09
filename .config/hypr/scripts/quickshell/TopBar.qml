@@ -164,7 +164,7 @@ Variants {
             // 2. The lightweight reader
             Process {
                 id: wsReader
-                command: ["bash", "-c", "cat /tmp/qs_workspaces.json 2>/dev/null"]
+                command: ["cat", "/tmp/qs_workspaces.json"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         let txt = this.text.trim();
@@ -192,19 +192,22 @@ Variants {
                 }
             }
 
-            // 3. Ultra-fast 50ms loop.
-            Timer { 
-                interval: 50 
-                running: true 
-                repeat: true 
-                onTriggered: wsReader.running = true 
+            // 3. ZERO-CPU Event Watcher (Replaces the brutal 50ms timer)
+            Process {
+                id: wsWatcher
+                running: true
+                command: ["bash", "-c", "inotifywait -qq -e close_write,modify /tmp/qs_workspaces.json"]
+                onExited: {
+                    wsReader.running = true;
+                    running = true;
+                }
             }
 
             // Music -------------------------------------
-            // 1. Fast cache reader to smoothly update the timestamp 
+            // 1. Fast cache reader to smoothly update the UI 
             Process {
                 id: musicPoller
-                command: ["bash", "-c", "cat /tmp/music_info.json 2>/dev/null"]
+                command: ["cat", "/tmp/music_info.json"]
                 stdout: StdioCollector {
                     onStreamFinished: {
                         let txt = this.text.trim();

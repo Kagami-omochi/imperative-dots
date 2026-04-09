@@ -1,37 +1,31 @@
 #!/usr/bin/env bash
 
 ## NETWORK
-get_wifi_status() { timeout 1 nmcli -t -f WIFI g 2>/dev/null || echo "disabled"; }
+get_wifi_status() {
+    # Instant kernel read. Bypasses NetworkManager completely.
+    if grep -q "up" /sys/class/net/wl*/operstate 2>/dev/null; then echo "enabled"; else echo "disabled"; fi
+}
+
 get_wifi_ssid() { 
-    # Ask the kernel directly (instant) to avoid NetworkManager scan delays
     local ssid=""
     if command -v iw &>/dev/null; then
-        # Handle spaces in SSID by grabbing everything after 'ssid '
-        ssid=$(timeout 1 iw dev 2>/dev/null | awk '/\s+ssid/ { $1=""; sub(/^ /, ""); print }' | head -n 1)
+        ssid=$(iw dev 2>/dev/null | awk '/\s+ssid/ { $1=""; sub(/^ /, ""); print; exit }')
     fi
-    
-    # Fast fallback to active connections only (bypasses environmental scans)
     if [ -z "$ssid" ]; then
-        ssid=$(timeout 1 nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | awk -F: '/802-11-wireless/ {print $1; exit}')
+        ssid=$(nmcli -t -f NAME,TYPE connection show --active 2>/dev/null | awk -F: '/802-11-wireless/ {print $1; exit}')
     fi
-    
     echo "${ssid:-}" 
 }
+
 get_wifi_strength() { 
-    # Fast read from kernel procfs (instant)
     local signal=$(awk 'NR==3 {gsub(/\./,"",$3); print int($3 * 100 / 70)}' /proc/net/wireless 2>/dev/null)
-    
-    # Fallback to nmcli with a longer timeout just in case
-    if [ -z "$signal" ]; then
-        signal=$(timeout 2 nmcli -f IN-USE,SIGNAL dev wifi 2>/dev/null | awk '/^\*/ {print $2; exit}')
-    fi
-    
     echo "${signal:-0}" 
 }
+
 get_wifi_icon() {
     local status=$(get_wifi_status)
-    local ssid=$(get_wifi_ssid)
     if [ "$status" = "enabled" ]; then
+        local ssid=$(get_wifi_ssid)
         if [ -n "$ssid" ]; then
             local signal=$(get_wifi_strength)
             if [ "$signal" -ge 75 ]; then echo "󰤨"
@@ -41,6 +35,7 @@ get_wifi_icon() {
         else echo "󰤯"; fi
     else echo "󰤮"; fi
 }
+
 toggle_wifi() {
     if [ "$(get_wifi_status)" = "enabled" ]; then
         nmcli radio wifi off
@@ -53,21 +48,40 @@ toggle_wifi() {
 
 ## BLUETOOTH
 get_bt_status() {
-    if timeout 1 bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then echo "on"
-    else echo "off"; fi
+    # Ask the bluez daemon directly. Accurate for both hardware blocks and software power-offs.
+    if bluetoothctl show 2>/dev/null | grep -q "Powered: yes"; then 
+        echo "on"
+    else 
+        echo "off"
+    fi
 }
-get_bt_icon() {
-    if [ "$(get_bt_status)" = "on" ]; then
-        if timeout 1 bluetoothctl devices Connected 2>/dev/null | grep -q "Device"; then echo "󰂱"
-        else echo "󰂯"; fi
-    else echo "󰂲"; fi
-}
+
 get_bt_connected_device() {
     if [ "$(get_bt_status)" = "on" ]; then
-        local device=$(timeout 1 bluetoothctl devices Connected 2>/dev/null | head -n1 | cut -d' ' -f3-)
-        echo "${device:-Disconnected}"
-    else echo "Off"; fi
+        # Gets the alias of the first actively connected device
+        local device=$(bluetoothctl devices Connected 2>/dev/null | head -n1 | cut -d' ' -f3-)
+        if [ -n "$device" ]; then
+            echo "$device"
+        else
+            echo "Disconnected"
+        fi
+    else 
+        echo "Off"
+    fi
 }
+
+get_bt_icon() {
+    if [ "$(get_bt_status)" = "on" ]; then
+        if bluetoothctl devices Connected 2>/dev/null | grep -q "^Device"; then 
+            echo "󰂱"
+        else 
+            echo "󰂯"
+        fi
+    else 
+        echo "󰂲"
+    fi
+}
+
 toggle_bt() {
     if [ "$(get_bt_status)" = "on" ]; then
         bluetoothctl power off 2>/dev/null
@@ -81,36 +95,35 @@ toggle_bt() {
 ## AUDIO
 get_volume() {
     local vol=""
-    if command -v wpctl &> /dev/null; then vol=$(timeout 1 wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -oP '\d+\.\d+' | awk '{print int($1*100)}')
-    elif command -v pamixer &> /dev/null; then vol=$(timeout 1 pamixer --get-volume 2>/dev/null)
-    elif command -v pactl &> /dev/null; then vol=$(timeout 1 pactl get-sink-volume @DEFAULT_SINK@ 2>/dev/null | grep -oP '\d+%' | head -n1 | tr -d '%')
+    if command -v wpctl &> /dev/null; then 
+        vol=$(wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | awk '{print int($2*100)}')
+    elif command -v pamixer &> /dev/null; then 
+        vol=$(pamixer --get-volume 2>/dev/null)
     fi
     echo "${vol:-0}"
 }
+
 is_muted() {
     if command -v wpctl &> /dev/null; then
-        timeout 1 wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -q "MUTED" && echo "true" || echo "false"
+        wpctl get-volume @DEFAULT_AUDIO_SINK@ 2>/dev/null | grep -q "MUTED" && echo "true" || echo "false"
     elif command -v pamixer &> /dev/null; then
-        timeout 1 pamixer --get-mute 2>/dev/null | grep -q "true" && echo "true" || echo "false"
-    elif command -v pactl &> /dev/null; then
-        timeout 1 pactl get-sink-mute @DEFAULT_SINK@ 2>/dev/null | grep -q "yes" && echo "true" || echo "false"
+        pamixer --get-mute 2>/dev/null | grep -q "true" && echo "true" || echo "false"
     else echo "false"; fi
 }
+
 toggle_mute() {
     if command -v wpctl &> /dev/null; then
         wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
     elif command -v pamixer &> /dev/null; then
         pamixer --toggle-mute 2>/dev/null
-    elif command -v pactl &> /dev/null; then
-        pactl set-sink-mute @DEFAULT_SINK@ toggle 2>/dev/null
     fi
     if [ "$(is_muted)" = "true" ]; then notify-send -u low -i audio-volume-muted "Volume" "Muted"
     else notify-send -u low -i audio-volume-high "Volume" "Unmuted ($(get_volume)%)"; fi
 }
+
 get_volume_icon() {
-    local vol=$(get_volume | tr -cd '0-9')
+    local vol=$(get_volume)
     local muted=$(is_muted)
-    [ -z "$vol" ] && vol=0
     if [ "$muted" = "true" ]; then echo "󰝟"
     elif [ "$vol" -ge 70 ]; then echo "󰕾"
     elif [ "$vol" -ge 30 ]; then echo "󰖀"
@@ -120,15 +133,13 @@ get_volume_icon() {
 
 ## BATTERY
 get_battery_percent() {
-    if [ -f /sys/class/power_supply/BAT*/capacity ]; then 
-        local bat=$(cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -n1)
-        echo "${bat:-100}"
-    else echo "100"; fi
+    cat /sys/class/power_supply/BAT*/capacity 2>/dev/null | head -n1 || echo "100"
 }
+
 get_battery_status() {
-    if [ -f /sys/class/power_supply/BAT*/status ]; then cat /sys/class/power_supply/BAT*/status 2>/dev/null | head -n1
-    else echo "Full"; fi
+    cat /sys/class/power_supply/BAT*/status 2>/dev/null | head -n1 || echo "Full"
 }
+
 get_battery_icon() {
     local percent=$(get_battery_percent)
     local status=$(get_battery_status)
@@ -155,9 +166,9 @@ get_battery_icon() {
 
 ## SYSTEM
 get_kb_layout() {
-    local layout=$(timeout 1 hyprctl devices -j 2>/dev/null | jq -r '.keyboards[]? | select(.main == true) | .active_keymap' | head -n1)
+    local layout=$(hyprctl devices -j 2>/dev/null | jq -r '.keyboards[]? | select(.main == true) | .active_keymap' | head -n1)
     [[ -z "$layout" || "$layout" == "null" ]] && layout="US"
-    echo "$layout" | cut -c1-2 | tr '[:lower:]' '[:upper:]'
+    echo "${layout:0:2}" | tr '[:lower:]' '[:upper:]'
 }
 
 ## EXECUTION
@@ -166,7 +177,6 @@ case $1 in
     --bt-toggle) toggle_bt ;;
     --toggle-mute) toggle_mute ;;
     *)
-        # If no arguments are passed, output the full state as JSON
         jq -n -c \
           --arg wifi_status "$(get_wifi_status)" \
           --arg wifi_ssid "$(get_wifi_ssid)" \
