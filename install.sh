@@ -3,7 +3,7 @@
 # ==============================================================================
 # Script Versioning & Initialization
 # ==============================================================================
-DOTS_VERSION="1.4.2"
+DOTS_VERSION="1.4.2-1"
 VERSION_FILE="$HOME/.local/state/imperative-dots-version"
 
 # Prevent the TTY/Console from falling asleep (black screen) during long package builds
@@ -16,6 +16,12 @@ WEATHER_API_KEY=""
 WEATHER_CITY_ID=""
 WEATHER_UNIT=""
 FAILED_PKGS=()
+
+# Optional Component States
+OPT_SDDM=false
+OPT_NVIM=false
+OPT_ZSH=false
+OPT_WALLPAPERS=false
 
 INSTALL_NVIM=false
 INSTALL_ZSH=false
@@ -46,25 +52,24 @@ KB_OPTIONS="grp:alt_shift_toggle"
 mkdir -p "$(dirname "$VERSION_FILE")"
 
 # Load previous choices if the file exists
-if [ -f "$VERSION_FILE" ]; then
+if [ -f "$VERSION_FILE" ] && [ -s "$VERSION_FILE" ]; then
     source "$VERSION_FILE"
-    if [ -n "$LOCAL_VERSION" ]; then
-        if [ -n "$KB_LAYOUTS" ]; then VISITED_KEYBOARD=true; fi
-        if [ -n "$WEATHER_API_KEY" ]; then VISITED_WEATHER=true; fi
-        if [ "$DRIVER_CHOICE" != "None (Skipped)" ] && [ -n "$DRIVER_CHOICE" ]; then VISITED_DRIVERS=true; fi
+    if [ -n "$LOCAL_VERSION" ] && [ "$LOCAL_VERSION" != "Not Installed" ]; then
+        [ -n "$KB_LAYOUTS" ] && VISITED_KEYBOARD=true
+        [ -n "$WEATHER_API_KEY" ] && VISITED_WEATHER=true
+        [[ "$DRIVER_CHOICE" != "None (Skipped)" && -n "$DRIVER_CHOICE" ]] && VISITED_DRIVERS=true
     fi
 else
     LOCAL_VERSION="Not Installed"
 fi
 
-# Generate an anonymous ID for telemetry if it doesn't exist yet
+# Generate Telemetry ID
 if [ -z "$TELEMETRY_ID" ]; then
     if command -v uuidgen &> /dev/null; then
         TELEMETRY_ID=$(uuidgen)
     else
         TELEMETRY_ID=$(cat /proc/sys/kernel/random/uuid 2>/dev/null || head -c 16 /dev/urandom | od -An -t x | tr -d ' ')
     fi
-    # Save it immediately so early exits don't generate a new ID every time
     echo "TELEMETRY_ID=\"$TELEMETRY_ID\"" >> "$VERSION_FILE"
 fi
 
@@ -762,13 +767,8 @@ manage_telemetry() {
     done
 }
 
-prompt_optional_features() {
-    draw_header
-    echo -e "${BOLD}${C_CYAN}=== Optional Component Setup ===${RESET}\n"
-
-    echo -e "${BOLD}1. Display Manager Integration${RESET}"
-
-    # Detect current display manager
+prompt_optional_features_menu() {
+    # Detect current display manager to set dynamic labels
     DM_SERVICES=("gdm" "gdm3" "lightdm" "sddm" "lxdm" "lxdm-gtk3" "ly")
     CURRENT_DM=""
     for dm in "${DM_SERVICES[@]}"; do
@@ -778,56 +778,76 @@ prompt_optional_features() {
         fi
     done
 
-    if [[ -z "$CURRENT_DM" ]]; then
-        read -p "No display manager detected. Do you want to install and enable SDDM? (y/N): " choice_sddm
-        if [[ "$choice_sddm" =~ ^[Yy]$ ]]; then
-            INSTALL_SDDM=true
-            SETUP_SDDM_THEME=true
-            PKGS+=("sddm")
-            echo -e "${C_GREEN}>> SDDM added to queue.${RESET}\n"
-        else
-            echo ""
-        fi
-    elif [[ "$CURRENT_DM" == "sddm" ]]; then
-        echo -e "Current session manager: ${C_YELLOW}sddm${RESET}"
-        read -p "Do you want to ADD a theme (don't remove the old ones)? (y/N): " choice_theme
-        if [[ "$choice_theme" =~ ^[Yy]$ ]]; then
-            SETUP_SDDM_THEME=true
-            echo -e "${C_GREEN}>> SDDM theme queued.${RESET}\n"
-        else
-            echo ""
-        fi
-    else
-        echo -e "Current session manager: ${C_YELLOW}${CURRENT_DM}${RESET}"
-        read -p "Do you want to replace it with SDDM? (y/N): " choice_replace
-        if [[ "$choice_replace" =~ ^[Yy]$ ]]; then
-            INSTALL_SDDM=true
-            REPLACE_DM=true
-            SETUP_SDDM_THEME=true
-            PKGS+=("sddm")
-            echo -e "${C_GREEN}>> SDDM added to queue (will replace $CURRENT_DM).${RESET}\n"
-        else
-            echo ""
-        fi
+    local DM_LABEL="Display Manager Integration (SDDM)"
+    if [[ "$CURRENT_DM" == "sddm" ]]; then
+        DM_LABEL="Configure SDDM Theme (sddm detected)"
+    elif [[ -n "$CURRENT_DM" ]]; then
+        DM_LABEL="Replace $CURRENT_DM with SDDM"
     fi
 
-    echo -e "${BOLD}2. Neovim Matugen Configuration${RESET}"
-    echo -e "${C_YELLOW}WARNING: If you use your own Neovim configuration, it will be overwritten/backed up.${RESET}"
-    read -p "Do you want to install this Neovim configuration? (y/N): " choice_nvim
-    if [[ "$choice_nvim" =~ ^[Yy]$ ]]; then
-        INSTALL_NVIM=true
-        PKGS+=("neovim" "lua-language-server" "unzip" "nodejs" "npm" "python3")
-        echo -e "${C_GREEN}>> Neovim added to queue.${RESET}\n"
-    fi
+    while true; do
+        clear
+        echo -e "${BOLD}${C_CYAN}=== Optional Component Setup ===${RESET}\n"
+        
+        # Dynamic toggle UI
+        local S_SDDM=$( [ "$OPT_SDDM" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
+        local S_NVIM=$( [ "$OPT_NVIM" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
+        local S_ZSH=$( [ "$OPT_ZSH" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
+        local S_WP=$( [ "$OPT_WALLPAPERS" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
 
-    echo -e "${BOLD}3. Zsh Shell${RESET}"
-    read -p "Do you want to install Zsh? (y/N): " choice_zsh
-    if [[ "$choice_zsh" =~ ^[Yy]$ ]]; then
-        INSTALL_ZSH=true
-        PKGS+=("zsh")
-        echo -e "${C_GREEN}>> Zsh added to queue.${RESET}\n"
-    fi
-    sleep 1.5
+        local MENU_ITEMS="1. $S_SDDM $DM_LABEL\n"
+        MENU_ITEMS+="2. $S_NVIM Neovim Matugen Configuration\n"
+        MENU_ITEMS+="3. $S_ZSH Zsh Shell Setup\n"
+        MENU_ITEMS+="4. $S_WP Download FULL Wallpaper Pack (Unchecked = 3 Random)\n"
+        MENU_ITEMS+="5. ${BOLD}${C_GREEN}Proceed with Installation / Update${RESET}\n"
+        MENU_ITEMS+="6. ${DIM}Back to Main Menu${RESET}"
+
+        local choice
+        choice=$(echo -e "$MENU_ITEMS" | fzf \
+            --ansi \
+            --layout=reverse \
+            --border=rounded \
+            --margin=1,2 \
+            --height=13 \
+            --prompt=" Options > " \
+            --pointer=">" \
+            --header=" SPACE or ENTER to toggle. Select Proceed when ready. ")
+
+        case "$choice" in
+            *"1"*) OPT_SDDM=$([ "$OPT_SDDM" = true ] && echo false || echo true) ;;
+            *"2"*) OPT_NVIM=$([ "$OPT_NVIM" = true ] && echo false || echo true) ;;
+            *"3"*) OPT_ZSH=$([ "$OPT_ZSH" = true ] && echo false || echo true) ;;
+            *"4"*) OPT_WALLPAPERS=$([ "$OPT_WALLPAPERS" = true ] && echo false || echo true) ;;
+            *"5"*) 
+                # Apply chosen toggles to installation logic
+                if [ "$OPT_SDDM" = true ]; then
+                    if [[ -z "$CURRENT_DM" ]]; then
+                        INSTALL_SDDM=true
+                        SETUP_SDDM_THEME=true
+                        PKGS+=("sddm")
+                    elif [[ "$CURRENT_DM" == "sddm" ]]; then
+                        SETUP_SDDM_THEME=true
+                    else
+                        INSTALL_SDDM=true
+                        REPLACE_DM=true
+                        SETUP_SDDM_THEME=true
+                        PKGS+=("sddm")
+                    fi
+                fi
+                if [ "$OPT_NVIM" = true ]; then
+                    INSTALL_NVIM=true
+                    PKGS+=("neovim" "lua-language-server" "unzip" "nodejs" "npm" "python3")
+                fi
+                if [ "$OPT_ZSH" = true ]; then
+                    INSTALL_ZSH=true
+                    PKGS+=("zsh")
+                fi
+                return 0 # Return success to start the installation process
+                ;;
+            *"6"*) return 1 ;; # Return failure code to jump back to main menu
+            *) ;;
+        esac
+    done
 }
 
 # ==============================================================================
@@ -897,8 +917,11 @@ while true; do
                 sleep 2.5
                 continue
             fi
-            prompt_optional_features
-            break 
+            if prompt_optional_features_menu; then
+                break 
+            else
+                continue
+            fi
             ;;
         *"8"*) clear; exit 0 ;;
         *) exit 0 ;;
@@ -1091,24 +1114,55 @@ else
         rm -rf "$WALLPAPER_CLONE_DIR"
     fi
 
-    # Clone with a dynamic progress bar
-    git clone --progress "$WALLPAPER_REPO" "$WALLPAPER_CLONE_DIR" 2>&1 | tr '\r' '\n' | while read -r line; do
-        if [[ "$line" =~ Receiving\ objects:\ *([0-9]+)% ]]; then
-            pc="${BASH_REMATCH[1]}"
-            fill=$(printf "%*s" $((pc / 2)) "" | tr ' ' '#')
-            empty=$(printf "%*s" $((50 - (pc / 2))) "" | tr ' ' '-')
-            printf "\r\033[K  -> Downloading: [%s%s] %3d%%" "$fill" "$empty" "$pc"
-        fi
-    done
-    echo "" # Ensure a clean new line after the progress bar finishes
+    if [[ "$OPT_WALLPAPERS" == true ]]; then
+        # Clone with a dynamic progress bar
+        git clone --progress "$WALLPAPER_REPO" "$WALLPAPER_CLONE_DIR" 2>&1 | tr '\r' '\n' | while read -r line; do
+            if [[ "$line" =~ Receiving\ objects:\ *([0-9]+)% ]]; then
+                pc="${BASH_REMATCH[1]}"
+                fill=$(printf "%*s" $((pc / 2)) "" | tr ' ' '#')
+                empty=$(printf "%*s" $((50 - (pc / 2))) "" | tr ' ' '-')
+                printf "\r\033[K  -> Downloading: [%s%s] %3d%%" "$fill" "$empty" "$pc"
+            fi
+        done
+        echo "" # Ensure a clean new line after the progress bar finishes
 
-    if [ -d "$WALLPAPER_CLONE_DIR/images" ]; then
-        cp -r "$WALLPAPER_CLONE_DIR/images/"* "$WALLPAPER_DIR/" 2>/dev/null || true
+        if [ -d "$WALLPAPER_CLONE_DIR/images" ]; then
+            cp -r "$WALLPAPER_CLONE_DIR/images/"* "$WALLPAPER_DIR/" 2>/dev/null || true
+        else
+            cp -r "$WALLPAPER_CLONE_DIR/"* "$WALLPAPER_DIR/" 2>/dev/null || true
+        fi
+        rm -rf "$WALLPAPER_CLONE_DIR"
+        printf "  -> Full wallpaper pack installed to %-12s ${C_GREEN}[ OK ]${RESET}\n" "$WALLPAPER_DIR"
     else
-        cp -r "$WALLPAPER_CLONE_DIR/"* "$WALLPAPER_DIR/" 2>/dev/null || true
+        echo -e "  -> ${C_CYAN}Fetching 3 random wallpapers to save time...${RESET}"
+        mkdir -p "$WALLPAPER_CLONE_DIR"
+        # Use a subshell to avoid changing the main script's working directory
+        (
+            cd "$WALLPAPER_CLONE_DIR" || exit
+            git init -q
+            git remote add origin "$WALLPAPER_REPO"
+            
+            # Fetch tree only without downloading blobs (file contents)
+            git fetch --depth 1 --filter=blob:none origin HEAD -q
+            
+            # Get 3 random image paths from the remote tree
+            RANDOM_PICS=$(git ls-tree -r origin/HEAD --name-only | grep -iE '\.(jpg|jpeg|png|gif|webp)$' | shuf -n 3)
+            
+            if [ -n "$RANDOM_PICS" ]; then
+                for pic in $RANDOM_PICS; do
+                    filename=$(basename "$pic")
+                    echo -n "    -> Downloading $filename... "
+                    # This command triggers the on-demand download of just this specific file
+                    git show origin/HEAD:"$pic" > "$WALLPAPER_DIR/$filename" 2>/dev/null
+                    echo -e "${C_GREEN}[ DONE ]${RESET}"
+                done
+            else
+                echo -e "    -> ${C_RED}Could not find any images in the repository.${RESET}"
+            fi
+        )
+        rm -rf "$WALLPAPER_CLONE_DIR"
+        printf "  -> Random wallpapers installed to %-12s ${C_GREEN}[ OK ]${RESET}\n" "$WALLPAPER_DIR"
     fi
-    rm -rf "$WALLPAPER_CLONE_DIR"
-    printf "  -> Wallpapers installed to %-12s ${C_GREEN}[ OK ]${RESET}\n" "$WALLPAPER_DIR"
 fi
 
 # --- 4. Copying Dotfiles & Backups ---
