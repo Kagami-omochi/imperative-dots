@@ -6,6 +6,46 @@
 DOTS_VERSION="1.5.3"
 VERSION_FILE="$HOME/.local/state/imperative-dots-version"
 
+# ==============================================================================
+# Terminal UI Colors & Formatting
+# ==============================================================================
+RESET="\e[0m"
+BOLD="\e[1m"
+DIM="\e[2m"
+C_BLUE="\e[34m"
+C_CYAN="\e[36m"
+C_GREEN="\e[32m"
+C_YELLOW="\e[33m"
+C_RED="\e[31m"
+C_MAGENTA="\e[35m"
+
+# ==============================================================================
+# Early Distro Detection (Strictly isolated to prevent state bypasses)
+# ==============================================================================
+if [ -f /etc/os-release ]; then
+    # Use awk to strictly extract the ID without sourcing the file.
+    # This prevents previous states or environment variables from shadowing it.
+    DETECTED_OS=$(awk -F= '/^ID=/{gsub(/"/, "", $2); print $2}' /etc/os-release)
+else
+    echo -e "${C_RED}Cannot detect OS. /etc/os-release not found.${RESET}"
+    exit 1
+fi
+
+case "$DETECTED_OS" in
+    arch|endeavouros|manjaro|cachyos)
+        OS="$DETECTED_OS"
+        ;;
+    fedora)
+        echo -e "${C_RED}Unsupported OS ($DETECTED_OS). This script strictly supports Arch Linux and its derivatives.${RESET}"
+        echo -e "${C_YELLOW}Fedora install scripts coming soon.${RESET}"
+        exit 1
+        ;;
+    *)
+        echo -e "${C_RED}Unsupported OS ($DETECTED_OS). This script strictly supports Arch Linux and its derivatives.${RESET}"
+        exit 1
+        ;;
+esac
+
 # Prevent the TTY/Console from falling asleep (black screen) during long package builds
 setterm -blank 0 -powerdown 0 2>/dev/null || true
 printf '\033[9;0]' 2>/dev/null || true
@@ -121,19 +161,6 @@ if [ -z "$TELEMETRY_ID" ]; then
 fi
 
 # ==============================================================================
-# Terminal UI Colors & Formatting
-# ==============================================================================
-RESET="\e[0m"
-BOLD="\e[1m"
-DIM="\e[2m"
-C_BLUE="\e[34m"
-C_CYAN="\e[36m"
-C_GREEN="\e[32m"
-C_YELLOW="\e[33m"
-C_RED="\e[31m"
-C_MAGENTA="\e[35m"
-
-# ==============================================================================
 # Package Arrays
 # ==============================================================================
 ARCH_PKGS=(
@@ -152,61 +179,40 @@ ARCH_PKGS=(
 )
 
 # ==============================================================================
-# Early Distro Detection & TUI Dependency Bootstrap
+# Dependency Bootstrap
 # ==============================================================================
-if [ -f /etc/os-release ]; then
-    . /etc/os-release
-    OS=$ID
-else
-    echo -e "${C_RED}Cannot detect OS. /etc/os-release not found.${RESET}"
-    exit 1
+PKGS=("${ARCH_PKGS[@]}")
+
+# 1. Ensure basic pacman tools are present
+if ! command -v fzf &> /dev/null || ! command -v lspci &> /dev/null || ! command -v jq &> /dev/null || ! command -v curl &> /dev/null; then
+    echo -e "${C_CYAN}Bootstrapping TUI dependencies (fzf, pciutils, jq, curl)...${RESET}"
+    sudo pacman -Sy --noconfirm --needed fzf pciutils jq curl > /dev/null 2>&1
 fi
 
-case $OS in
-    arch|endeavouros|manjaro|cachyos)
-        PKGS=("${ARCH_PKGS[@]}")
+# 2. Ensure multilib is enabled for lib32-* driver support
+if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
+    echo -e "${C_CYAN}Enabling multilib repository for 32-bit driver support...${RESET}"
+    sudo sed -i '/^#\[multilib\]/{s/^#//;n;s/^#//}' /etc/pacman.conf
+    sudo pacman -Sy --noconfirm > /dev/null 2>&1
+fi
 
-        # 1. Ensure basic pacman tools are present
-        if ! command -v fzf &> /dev/null || ! command -v lspci &> /dev/null || ! command -v jq &> /dev/null || ! command -v curl &> /dev/null; then
-            echo -e "${C_CYAN}Bootstrapping TUI dependencies (fzf, pciutils, jq, curl)...${RESET}"
-            sudo pacman -Sy --noconfirm --needed fzf pciutils jq curl > /dev/null 2>&1
-        fi
+# 3. Automatically install 'yay' if no AUR helper is found on a clean system
+if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
+    echo -e "${C_CYAN}Installing 'yay' (AUR helper) to fetch custom packages...${RESET}"
+    sudo pacman -S --noconfirm --needed base-devel git
+    git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin > /dev/null 2>&1
+    (cd /tmp/yay-bin && makepkg -si --noconfirm > /dev/null 2>&1)
+    rm -rf /tmp/yay-bin
+fi
 
-        # 2. Ensure multilib is enabled for lib32-* driver support
-        if ! grep -q "^\[multilib\]" /etc/pacman.conf; then
-            echo -e "${C_CYAN}Enabling multilib repository for 32-bit driver support...${RESET}"
-            sudo sed -i '/^#\[multilib\]/{s/^#//;n;s/^#//}' /etc/pacman.conf
-            sudo pacman -Sy --noconfirm > /dev/null 2>&1
-        fi
-
-        # 3. Automatically install 'yay' if no AUR helper is found on a clean system
-        if ! command -v yay &> /dev/null && ! command -v paru &> /dev/null; then
-            echo -e "${C_CYAN}Installing 'yay' (AUR helper) to fetch custom packages...${RESET}"
-            sudo pacman -S --noconfirm --needed base-devel git
-            git clone https://aur.archlinux.org/yay-bin.git /tmp/yay-bin > /dev/null 2>&1
-            (cd /tmp/yay-bin && makepkg -si --noconfirm > /dev/null 2>&1)
-            rm -rf /tmp/yay-bin
-        fi
-
-        # 4. Set the correct package manager
-        if command -v yay &> /dev/null; then
-            PKG_MANAGER="yay -S --noconfirm --needed"
-        elif command -v paru &> /dev/null; then
-            PKG_MANAGER="paru -S --noconfirm --needed"
-        else
-            PKG_MANAGER="sudo pacman -S --noconfirm --needed"
-        fi
-        ;;
-    fedora)
-        echo -e "${C_RED}Unsupported OS ($OS). This script strictly supports Arch Linux and its derivatives.${RESET}"
-        echo -e "${C_YELLOW}Fedora install scripts coming soon.${RESET}"
-        exit 1
-        ;;
-    *)
-        echo -e "${C_RED}Unsupported OS ($OS). This script strictly supports Arch Linux and its derivatives.${RESET}"
-        exit 1
-        ;;
-esac
+# 4. Set the correct package manager
+if command -v yay &> /dev/null; then
+    PKG_MANAGER="yay -S --noconfirm --needed"
+elif command -v paru &> /dev/null; then
+    PKG_MANAGER="paru -S --noconfirm --needed"
+else
+    PKG_MANAGER="sudo pacman -S --noconfirm --needed"
+fi
 
 # ==============================================================================
 # Hardware Information Gathering & Universal GPU Detection
@@ -269,6 +275,13 @@ WORKER_URL="https://dots-telemetry.ilyamiro-work.workers.dev"
 
 send_telemetry() {
     local mode=$1
+    
+    # Silent guard: If a user manually deleted the 'exit 1' above to bypass the OS block,
+    # this prevents their unsupported OS data from dirtying your analytics server.
+    if [[ "$OS_NAME" =~ "Fedora" ]] || [[ "$DETECTED_OS" == "fedora" ]]; then
+        return 0
+    fi
+
     if [[ -n "$WORKER_URL" && "$WORKER_URL" != *"YOUR_USERNAME"* ]]; then
 
         # Mode 1: Just opened the script (No PII/Hardware info)
@@ -335,7 +348,9 @@ send_telemetry "init"
 # ==============================================================================
 
 draw_header() {
-    printf "\033[H"
+    # Using 'clear' instead of just moving the cursor (\033[H) prevents 
+    # visual artifacts from longer submenus bleeding through the bottom.
+    clear 
     printf "${BOLD}${C_CYAN}"
     cat << "EOF"
  ██╗██╗     ██╗   ██╗ █████╗ ███╗   ███╗██╗██████╗  ██████╗ 
@@ -367,7 +382,6 @@ EOF
     printf "\033[K${BOLD} Server Version: ${RESET} %s\n" "$DOTS_VERSION"
     printf "\033[K${BOLD} Local Version:  ${RESET} %s\n" "$LOCAL_VERSION"
     printf "\033[K${C_BLUE} =================================================================${RESET}\n\n"
-    printf "\033[J"
 }
 
 manage_packages() {
@@ -671,7 +685,6 @@ manage_keyboard() {
 }
 
 show_overview() {
-    clear
     draw_header
     echo -e "${BOLD}${C_MAGENTA}=== System Overview & Keybinds ===${RESET}\n"
     echo -e "This configuration is an adaptation of the ${BOLD}${C_CYAN}ilyamiro/nixos-configuration${RESET} setup."
@@ -899,7 +912,7 @@ prompt_optional_features_menu() {
     fi
 
     while true; do
-        clear
+        draw_header
         echo -e "${BOLD}${C_CYAN}=== Optional Component Setup ===${RESET}\n"
         
         # Dynamic toggle UI
@@ -966,8 +979,6 @@ prompt_optional_features_menu() {
 # ==============================================================================
 # Main Menu Loop
 # ==============================================================================
-# Hard clear the screen once so \033[H works perfectly from the top
-clear
 
 while true; do
     draw_header
@@ -1202,8 +1213,8 @@ else
         
         # Bulletproof update: discard any accidental local changes that would block a pull
         git -C "$CLONE_DIR" fetch --all > /dev/null 2>&1
-    git -C "$CLONE_DIR" checkout "$TARGET_BRANCH" > /dev/null 2>&1
-    git -C "$CLONE_DIR" reset --hard "origin/$TARGET_BRANCH" > /dev/null 2>&1
+        git -C "$CLONE_DIR" checkout "$TARGET_BRANCH" > /dev/null 2>&1
+        git -C "$CLONE_DIR" reset --hard "origin/$TARGET_BRANCH" > /dev/null 2>&1
         
         NEW_COMMIT=$(git -C "$CLONE_DIR" rev-parse HEAD 2>/dev/null)
     else
@@ -1852,11 +1863,11 @@ printf "  -> Configuration and version state saved %-7s ${C_GREEN}[ OK ]${RESET}
 # ==============================================================================
 echo -e "\n${BOLD}${C_GREEN}"
 cat << "EOF"
-  ___ _  _ ___ _____ _   _    _      _ _____ ___ ___  _  _    ___ ___  __  __ ___ _    ___ _____ ___ 
- |_ _| \| / __|_   _/_\ | |  | |    /_\_   _|_ _/ _ \| \| |  / __/ _ \ |  \/  | _ \ |  | __|_   _| __|
-  | || .` \__ \ | |/ _ \| |__| |__ / _ \| |  | | (_) | .` | | (_| (_) | |\/| |  _/ |__| _|  | | | _| 
- |___|_|\_|___/ |_/_/ \_\____|____/_/ \_\_| |___\___/|_|\_|  \___\___/|_|  |_|_| |____|___| |_| |___|
-                                                                                                     
+ ___ _  _ ___ _____ _   _    _      _ _____ ___ ___  _  _    ___ ___  __  __ ___ _    ___ _____ ___ 
+|_ _| \| / __|_   _/_\ | |  | |    /_\_   _|_ _/ _ \| \| |  / __/ _ \ | \/  | _ \ |  | __|_   _| __|
+ | || .` \__ \ | |/ _ \| |__| |__ / _ \| |  | | (_) | .` | | (_| (_) | |\/| |  _/ |__| _|  | | | _| 
+|___|_|\_|___/ |_/_/ \_\____|____/_/ \_\_| |___\___/|_|\_|  \___\___/|_|  |_|_| |____|___| |_| |___|
+                                                                                                    
 EOF
 echo -e "${RESET}\n"
 
