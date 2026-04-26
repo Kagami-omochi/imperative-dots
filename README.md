@@ -6,7 +6,7 @@
 bash -c "$(curl -fsSL https://raw.githubusercontent.com/Kagami-omochi/imperative-dots/master/install.sh)"
 ```
 
-### Reach out to me:
+### Reach out to Original author:
 #### twitter/x: @ilyamirox
 #### reddit: u/ilyamiro1
 #### telegram: @sacrificeit
