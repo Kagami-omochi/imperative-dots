@@ -3,7 +3,7 @@
 
 ### To install:
 ```bash
-bash -c "$(curl -fsSL https://raw.githubusercontent.com/ilyamiro/imperative-dots/master/install.sh)"
+bash -c "$(curl -fsSL https://raw.githubusercontent.com/Kagami-omochi/imperative-dots/master/install.sh)"
 ```
 
 ### Reach out to me:
