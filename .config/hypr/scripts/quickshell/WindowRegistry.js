@@ -33,7 +33,7 @@ function getLayout(name, mx, my, mw, mh, userScale) {
     let base = {
         // --- Top Right Popups ---
         "battery":   { w: s(801, scale), h: s(760, scale), rx: mw - s(805, scale), ry: s(60, scale), comp: "battery/BatteryPopup.qml" },
-        "network":   { w: s(850, scale), h: s(700, scale), rx: mw - s(854, scale), ry: s(60, scale), comp: "network/NetworkPopup.qml" },
+        "network":   { w: s(900, scale), h: s(700, scale), rx: mw - s(904, scale), ry: s(60, scale), comp: "network/NetworkPopup.qml" },
         "volume":    { w: s(450, scale), h: s(700, scale), rx: mw - s(455, scale), ry: s(60, scale), comp: "volume/VolumePopup.qml" },
         
         // --- Central Standard Tools ---
@@ -54,7 +54,6 @@ function getLayout(name, mx, my, mw, mh, userScale) {
         // --- Top Left Edge ---
         "music":     { w: s(700, scale), h: s(650, scale), rx: s(5, scale), ry: s(60, scale), comp: "music/MusicPopup.qml" },
 
-        // --- Movie Widget (Height drastically increased to 850 for dashboard) ---
         "movies": {
             w: s(1370, scale),
             h: s(850, scale),
@@ -65,7 +64,6 @@ function getLayout(name, mx, my, mw, mh, userScale) {
         
         // --- Screen Spanning Panels ---
         "settings":  { w: s(450, scale), h: mh - s(0, scale), rx: s(0, scale), ry: s(0, scale), comp: "settings/SettingsPopup.qml" },
-        "sidepanel": { w: s(600, scale), h: mh - s(60, scale), rx: mw - s(604, scale), ry: s(56, scale), comp: "sidepanel/SidePanel.qml" },
         
         // --- Utility ---
         "hidden":    { w: 1, h: 1, rx: -5000 - mx, ry: -5000 - my, comp: "" } 
