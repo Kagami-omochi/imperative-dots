@@ -207,12 +207,24 @@ PanelWindow {
         
         let t = getLayout(masterWindow.currentActive);
         if (t) {
-            masterWindow.animX = t.rx;
+            let currentItem = widgetStack.currentItem;
+            
+            // Check if the current widget has dynamic dimensional overrides
+            let finalW = (currentItem && currentItem.targetMasterWidth !== undefined) ? currentItem.targetMasterWidth : t.w;
+            let finalH = (currentItem && currentItem.targetMasterHeight !== undefined) ? currentItem.targetMasterHeight : t.h;
+            
+            // Re-center X if the width dynamically changed
+            let finalX = t.rx;
+            if (currentItem && currentItem.targetMasterWidth !== undefined && finalW !== t.w) {
+                finalX = Math.floor((masterWindow.width / 2) - (finalW / 2));
+            }
+
+            masterWindow.animX = finalX;
             masterWindow.animY = t.ry;
-            masterWindow.animW = t.w;
-            masterWindow.animH = t.h;
-            masterWindow.targetW = t.w;
-            masterWindow.targetH = t.h;
+            masterWindow.animW = finalW;
+            masterWindow.animH = finalH;
+            masterWindow.targetW = finalW;
+            masterWindow.targetH = finalH;
         }
     }
 
@@ -355,9 +367,23 @@ PanelWindow {
             widgetStack.replace(t.comp, props);
         }
         
+        // Ensure Main.qml respects the dynamic size of the newly loaded widget immediately
+        let currentItem = widgetStack.currentItem;
+        if (currentItem) {
+            if (currentItem.targetMasterWidth !== undefined) {
+                let dynW = currentItem.targetMasterWidth;
+                masterWindow.animW = dynW;
+                masterWindow.targetW = dynW;
+                masterWindow.animX = Math.floor((masterWindow.width / 2) - (dynW / 2));
+            }
+            if (currentItem.targetMasterHeight !== undefined) {
+                masterWindow.animH = currentItem.targetMasterHeight;
+                masterWindow.targetH = currentItem.targetMasterHeight;
+            }
+        }
+        
         masterWindow.isVisible = true;
     }
-
     // =========================================================
     // --- IPC: EVENT-DRIVEN WATCHER
     // =========================================================
