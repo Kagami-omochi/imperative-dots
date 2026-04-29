@@ -7,7 +7,16 @@ def fetch_apps():
     apps = {}
     home = os.path.expanduser('~')
     
-    # Expanded directories to catch Flatpaks, system apps, and Nix packages
+    # 📌 QML側が作成するピン留めリストのJSONファイルを読み込む
+    config_dir = f'{home}/.config/hypr/scripts/quickshell/applauncher'
+    pinned_file = os.path.join(config_dir, 'pinned_apps.json')
+    
+    try:
+        with open(pinned_file, 'r', encoding='utf-8') as f:
+            pinned_names = json.load(f)
+    except Exception:
+        pinned_names = [] # ファイルが無い場合は空リスト
+    
     dirs = [
         '/usr/share/applications',
         '/usr/local/share/applications',
@@ -40,7 +49,6 @@ def fetch_apps():
                             if line.startswith('Name=') and not app['name']:
                                 app['name'] = line[5:]
                             elif line.startswith('Exec=') and not app['exec']:
-                                # Strip %u, %f, and @@ placeholders
                                 app['exec'] = line[5:].split(' %')[0].split(' @@')[0]
                             elif line.startswith('Icon=') and not app['icon']:
                                 app['icon'] = line[5:]
@@ -52,11 +60,26 @@ def fetch_apps():
             except Exception:
                 pass
                 
-    # Sort alphabetically and return as JSON
-    res = list(apps.values())
-    res.sort(key=lambda x: x['name'].lower())
-    print(json.dumps(res))
+    pinned_list = []
+    unpinned_list = []
+
+    # 保存された順序・完全一致でピン留めアプリを抽出
+    for app_name in pinned_names:
+        if app_name in apps:
+            app = apps[app_name]
+            app['pinned'] = True
+            pinned_list.append(app)
+            del apps[app_name]
+
+    remaining_apps = list(apps.values())
+    remaining_apps.sort(key=lambda x: x['name'].lower())
+    
+    for app in remaining_apps:
+        app['pinned'] = False
+        unpinned_list.append(app)
+
+    final_res = pinned_list + unpinned_list
+    print(json.dumps(final_res))
 
 if __name__ == "__main__":
     fetch_apps()
-

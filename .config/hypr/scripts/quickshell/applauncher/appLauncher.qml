@@ -150,6 +150,30 @@ Item {
         Quickshell.execDetached(["bash", Quickshell.env("HOME") + "/.config/hypr/scripts/qs_manager.sh", "close"]);
     }
 
+    function togglePin(appName) {
+        let appRef = null;
+        for (let i = 0; i < allApps.length; i++) {
+            if (allApps[i].name === appName) {
+                allApps[i].pinned = !allApps[i].pinned;
+                appRef = allApps[i];
+                break;
+            }
+        }
+        
+        if (!appRef) return;
+
+        let pinnedApps = allApps.filter(a => a.pinned).sort((a, b) => a.name.localeCompare(b.name));
+        let unpinnedApps = allApps.filter(a => !a.pinned).sort((a, b) => a.name.localeCompare(b.name));
+        window.allApps = pinnedApps.concat(unpinnedApps);
+
+        let pinnedNames = pinnedApps.map(a => a.name);
+        let safeJson = JSON.stringify(pinnedNames).replace(/'/g, "'\\''");
+        let scriptPath = Quickshell.env("HOME") + "/.config/hypr/scripts/quickshell/applauncher/pinned_apps.json";
+        Quickshell.execDetached(["bash", "-c", "echo '" + safeJson + "' > " + scriptPath]);
+
+        filterApps(searchInput.text);
+    }
+
     // --- AGGRESSIVE FOCUS MANAGEMENT ---
     Timer {
         id: focusTimer
@@ -534,13 +558,36 @@ Item {
                             }
                         }
 
+                        Text {
+                                text: "󰐃"
+                                font.family: "Iosevka Nerd Font"
+                                font.pixelSize: window.s(16)
+                                color: index === appList.currentIndex ? window.crust : window.subtext0
+                                visible: model.pinned === true
+                                
+                                property real iconShift: index === appList.currentIndex ? window.s(-6) : 0
+                                transform: Translate { x: iconShift }
+
+                                Behavior on iconShift { 
+                                    NumberAnimation { duration: 500; easing.type: Easing.OutExpo } 
+                                }
+                                Behavior on color { ColorAnimation { duration: 300; easing.type: Easing.OutExpo } }
+                            }
+
                         MouseArea {
                             id: ma
                             anchors.fill: parent
                             hoverEnabled: true
-                            onClicked: {
-                                appList.currentIndex = index;
-                                launchApp(model.exec);
+                            
+                            acceptedButtons: Qt.LeftButton | Qt.RightButton
+                            
+                            onClicked: (mouse) => {
+                                if (mouse.button === Qt.RightButton) {
+                                    window.togglePin(model.name);
+                                } else {
+                                    appList.currentIndex = index;
+                                    launchApp(model.exec);
+                                }
                             }
                         }
                     }
