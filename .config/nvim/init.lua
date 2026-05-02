@@ -131,7 +131,7 @@ _G.reload_matugen_colors = function()
     -- Reload lualine dynamically safely
     local ok_lualine, lualine = pcall(require, "lualine")
     if ok_lualine then
-      lualine.setup { options = { theme = 'catppuccin' } }
+      lualine.setup { options = { theme = 'catppuccin-nvim' } }
     end
     
     -- Force Neovim to redraw

@@ -3,7 +3,7 @@
 # ==============================================================================
 # Script Versioning & Initialization
 # ==============================================================================
-DOTS_VERSION="1.6.7-5"
+DOTS_VERSION="1.7.0-2"
 VERSION_FILE="$HOME/.local/state/imperative-dots-version"
 
 # ==============================================================================
@@ -110,6 +110,7 @@ OPT_NVIM=false
 OPT_ZSH=false
 OPT_WALLPAPERS=false
 OPT_OVERRIDE_KEYBINDS=false
+OPT_OVERRIDE_STARTUPS=false
 
 INSTALL_NVIM=false
 INSTALL_ZSH=false
@@ -166,8 +167,7 @@ fi
 # Package Arrays
 # ==============================================================================
 ARCH_PKGS=(
-    "hyprland" "hypridle" "kitty" "cava" "zbar" "rofi-wayland" 
-    "pavucontrol" "alsa-utils" "awww" "networkmanager-dmenu-git"
+    "hyprland" "hypridle" "kitty" "cava" "zbar" "pavucontrol" "alsa-utils" "awww" "networkmanager-dmenu-git"
     "wl-clipboard" "fd" "qt6-multimedia" "qt6-5compat" "ripgrep"
     "cliphist" "jq" "socat" "inotify-tools" "pamixer" "brightnessctl" "acpi" "iw"
     "bluez" "bluez-utils" "libnotify" "networkmanager" "lm_sensors" "bc" 
@@ -384,13 +384,13 @@ EOF
     # OSC 8 Escape Sequences for Clickable Hyperlinks
     local OSC8_GH="\e]8;;https://github.com/ilyamiro/imperative-dots.git\a"
     local OSC8_TW="\e]8;;https://twitter.com/ilyamirox\a"
-    local OSC8_RD="\e]8;;https://reddit.com/r/ilyamiro1\a"
+    local OSC8_RD="\e]8;;https://reddit.com/u/ilyamiro1\a"
     local OSC8_KF="\e]8;;https://ko-fi.com/ilyamiro\a"
     local OSC8_END="\e]8;;\a"
 
     printf "\033[K${C_BLUE} -----------------------------------------------------------------${RESET}\n"
     printf "\033[K${BOLD}${C_GREEN} GitHub:${RESET}  ${OSC8_GH}https://github.com/ilyamiro/imperative-dots.git${OSC8_END}\n"
-    printf "\033[K${BOLD}${C_CYAN} Twitter:${RESET} ${OSC8_TW}@ilyamirox${OSC8_END}  |  ${BOLD}${C_RED}Reddit:${RESET} ${OSC8_RD}r/ilyamiro1${OSC8_END}\n"
+    printf "\033[K${BOLD}${C_CYAN} Twitter:${RESET} ${OSC8_TW}@ilyamirox${OSC8_END}  |  ${BOLD}${C_RED}Reddit:${RESET} ${OSC8_RD}u/ilyamiro1${OSC8_END}\n"
     printf "\033[K${BOLD}${C_MAGENTA} Donate:${RESET}  ${OSC8_KF}Donate on Ko-fi (Help the project!)${OSC8_END}\n"
     printf "\033[K${C_BLUE} -----------------------------------------------------------------${RESET}\n"
     printf "\033[K${BOLD} User:           ${RESET} %s\n" "$USER_NAME"
@@ -560,31 +560,63 @@ manage_drivers() {
 
 manage_keyboard() {
     local available_layouts=(
-        "gb - English (UK)" "au - English (Australia)"
-        "ca - English/French (Canada)" "ie - English (Ireland)"
-        "nz - English (New Zealand)" "za - English (South Africa)"
-        "fr - French" "be - Belgian" "ch - Swiss"
-        "de - German" "at - Austrian" "nl - Dutch" "lu - Luxembourgish"
-        "es - Spanish" "pt - Portuguese" "br - Portuguese (Brazil)"
-        "it - Italian" "gr - Greek" "mt - Maltese"
-        "se - Swedish" "no - Norwegian" "dk - Danish"
-        "fi - Finnish" "is - Icelandic"
-        "pl - Polish" "cz - Czech" "sk - Slovak" "hu - Hungarian"
-        "ro - Romanian" "bg - Bulgarian" "ru - Russian" "ua - Ukrainian"
-        "by - Belarusian" "rs - Serbian" "hr - Croatian" "si - Slovenian"
-        "mk - Macedonian" "ba - Bosnian" "me - Montenegrin"
-        "lt - Lithuanian" "lv - Latvian" "ee - Estonian"
-        "am - Armenian" "ge - Georgian" "kz - Kazakh" "kg - Kyrgyz"
-        "tj - Tajik" "tm - Turkmen" "uz - Uzbek" "mn - Mongolian"
-        "il - Hebrew" "ara - Arabic" "ir - Persian (Farsi)"
-        "iq - Iraqi" "sy - Syrian"
-        "in - Indian" "pk - Pakistani" "bd - Bangla"
-        "th - Thai" "vn - Vietnamese" "la - Lao"
-        "mm - Burmese" "kh - Khmer"
-        "cn - Chinese" "jp - Japanese" "kr - Korean" "tw - Taiwanese"
-        "ng - Nigerian" "ma - Moroccan" "dz - Algerian" "et - Ethiopian"
-        "latam - Spanish (Latin America)"
-        "al - Albanian" "fo - Faroese"
+        # --- Americas ---
+        "us - English (US)" "ca - English/French (Canada)" "ca-multix - Canadian Multilingual"
+        "latam - Spanish (Latin America)" "br - Portuguese (Brazil)" "ar - Arabic (Latin America)"
+        "bo - Bolivia" "cl - Chile" "co - Colombia" "cr - Costa Rica" "cu - Cuba" 
+        "do - Dominican Republic" "ec - Ecuador" "sv - El Salvador" "gt - Guatemala" 
+        "hn - Honduras" "mx - Mexico" "ni - Nicaragua" "pa - Panama" "py - Paraguay" 
+        "pe - Peru" "pr - Puerto Rico" "uy - Uruguay" "ve - Venezuela"
+
+        # --- Europe (West, Central, & North) ---
+        "gb - English (UK)" "ie - English (Ireland)" "gd - Scottish Gaelic" "cy-gb - Welsh"
+        "fr - French" "be - Belgian" "ch - Swiss" "de - German" "at - Austrian" 
+        "nl - Dutch" "lu - Luxembourgish" "es - Spanish" "pt - Portuguese" 
+        "it - Italian" "mt - Maltese" "se - Swedish" "no - Norwegian" "dk - Danish" 
+        "fi - Finnish" "is - Icelandic" "fo - Faroese" "gl - Greenlandic"
+        "pl - Polish" "cz - Czech" "sk - Slovak" "hu - Hungarian" 
+        "ad - Andorra" "mc - Monaco" "sm - San Marino" "va - Vatican"
+        "epo - Esperanto" "eu - Basque" "ca-fr - Catalan" 
+
+        # --- Europe (East) & Caucasus ---
+        "ru - Russian" "ua - Ukrainian" "by - Belarusian" "ro - Romanian" "bg - Bulgarian" 
+        "rs - Serbian" "hr - Croatian" "si - Slovenian" "mk - Macedonian" "ba - Bosnian" 
+        "me - Montenegrin" "gr - Greek" "cy - Cyprus" "ee - Estonian" "lv - Latvian" 
+        "lt - Lithuanian" "md - Moldovan" "am - Armenian" "ge - Georgian" "az - Azerbaijani" 
+        "kz - Kazakh" "kg - Kyrgyz" "tj - Tajik" "tm - Turkmen" "uz - Uzbek" 
+        "mn - Mongolian" "tat - Tatar" "chu - Chuvash" "os - Ossetian" "udm - Udmurt" 
+        "kbd - Kabardian" "che - Chechen"
+
+        # --- Asia & Pacific ---
+        "au - English (Australia)" "nz - English (New Zealand)" 
+        "cn - Chinese" "jp - Japanese" "kr - Korean" "tw - Taiwanese" "hk - Hong Kong"
+        "in - Indian" "pk - Pakistani" "bd - Bangla" "lk - Sri Lankan" "np - Nepali" 
+        "mv - Maldivian (Dhivehi)" "bt - Bhutanese (Dzongkha)" "af - Afghan (Pashto/Dari)"
+        "th - Thai" "vn - Vietnamese" "la - Lao" "mm - Burmese" "kh - Khmer" 
+        "id - Indonesian" "my - Malay" "ph - Filipino" "sg - Singaporean" 
+        "bn - Bengali" "ta - Tamil" "te - Telugu" "gu - Gujarati" "pa - Punjabi" 
+        "ml - Malayalam" "kn - Kannada" "or - Odia" "as - Assamese" "ur - Urdu"
+
+        # --- Middle East & North Africa ---
+        "il - Hebrew" "ara - Arabic" "iq - Iraqi" "sy - Syrian" "ir - Persian (Farsi)"
+        "ma - Moroccan" "dz - Algerian" "eg - Egyptian" "ly - Libyan" "tn - Tunisian" 
+        "sd - Sudanese" "lb - Lebanese" "jo - Jordanian" "ps - Palestinian" 
+        "sa - Saudi Arabian" "kw - Kuwaiti" "bh - Bahraini" "qa - Qatari" "ae - UAE" 
+        "om - Omani" "ye - Yemeni"
+
+        # --- Sub-Saharan Africa ---
+        "za - English (South Africa)" "ng - Nigerian" "et - Ethiopian" "sn - Senegalese"
+        "ke - Kenyan" "tz - Tanzanian" "gh - Ghanaian" "cm - Cameroonian" "ci - Ivorian"
+        "ml - Malian" "gn - Guinean" "cd - Congolese (DRC)" "cg - Congolese (RC)"
+        "rw - Rwandan" "bi - Burundian" "ug - Ugandan" "zm - Zambian" "zw - Zimbabwean"
+        "mw - Malawian" "mz - Mozambican" "ao - Angolan" "na - Namibian" "bw - Motswana"
+        "mg - Malagasy" "so - Somali" "dj - Djiboutian" "er - Eritrean" "tg - Togolese"
+        "bj - Beninese" "bf - Burkinabe" "ne - Nigerien" "td - Chadian" "cf - Central African"
+        "gq - Equatorial Guinean" "ga - Gabonese"
+
+        # --- Alternative Layouts ---
+        "us-intl - US International" "dvorak - US Dvorak" "colemak - US Colemak" 
+        "norman - US Norman" "workman - US Workman" "math - Mathematics" "brai - Braille"
     )
     
     local selected_codes=()
@@ -940,14 +972,16 @@ prompt_optional_features_menu() {
         local S_ZSH=$( [ "$OPT_ZSH" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
         local S_WP=$( [ "$OPT_WALLPAPERS" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
         local S_KB_OVR=$( [ "$OPT_OVERRIDE_KEYBINDS" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
+        local S_STARTUPS_OVR=$( [ "$OPT_OVERRIDE_STARTUPS" = true ] && echo -e "${C_GREEN}[x]${RESET}" || echo -e "${DIM}[ ]${RESET}" )
 
         local MENU_ITEMS="1. $S_SDDM $DM_LABEL\n"
         MENU_ITEMS+="2. $S_NVIM Neovim Matugen Configuration\n"
         MENU_ITEMS+="3. $S_ZSH Zsh Shell Setup\n"
         MENU_ITEMS+="4. $S_WP Download FULL Wallpaper Pack (Unchecked = 3 Random)\n"
         MENU_ITEMS+="5. $S_KB_OVR Override Keybinds (Unchecked = Keep Local)\n"
-        MENU_ITEMS+="6. ${BOLD}${C_GREEN}Proceed with Installation / Update${RESET}\n"
-        MENU_ITEMS+="7. ${DIM}Back to Main Menu${RESET}"
+        MENU_ITEMS+="6. $S_STARTUPS_OVR Override Startups (Unchecked = Keep Local, Add missing ones)\n"
+        MENU_ITEMS+="7. ${BOLD}${C_GREEN}Proceed with Installation / Update${RESET}\n"
+        MENU_ITEMS+="8. ${DIM}Back to Main Menu${RESET}"
 
         local choice
         choice=$(echo -e "$MENU_ITEMS" | fzf \
@@ -966,7 +1000,8 @@ prompt_optional_features_menu() {
             *"3."*) OPT_ZSH=$([ "$OPT_ZSH" = true ] && echo false || echo true) ;;
             *"4."*) OPT_WALLPAPERS=$([ "$OPT_WALLPAPERS" = true ] && echo false || echo true) ;;
             *"5."*) OPT_OVERRIDE_KEYBINDS=$([ "$OPT_OVERRIDE_KEYBINDS" = true ] && echo false || echo true) ;;
-            *"6."*) 
+            *"6."*) OPT_OVERRIDE_STARTUPS=$([ "$OPT_OVERRIDE_STARTUPS" = true ] && echo false || echo true) ;;
+            *"7."*) 
                 # Apply chosen toggles to installation logic
                 if [ "$OPT_SDDM" = true ]; then
                     if [[ -z "$CURRENT_DM" ]]; then
@@ -1005,7 +1040,7 @@ prompt_optional_features_menu() {
                 fi
                 return 0 # Return success to start the installation process
                 ;;
-            *"7."*) return 1 ;; # Return failure code to jump back to main menu
+            *"8."*) return 1 ;; # Return failure code to jump back to main menu
             *) ;;
         esac
     done
@@ -1396,15 +1431,13 @@ if [ "$DO_FULL_INSTALL" = true ]; then
         printf "  -> Restored existing settings.json  %-12s ${C_GREEN}[ OK ]${RESET}\n" ""
     fi
 else
-    # Partial Update Logic (Git Diff)
+   # Partial Update Logic (Git Diff)
     CHANGED_FILES=""
     DELETED_FILES=""
     
     if [ "$OLD_COMMIT" != "$NEW_COMMIT" ]; then
-        # 'AM' catches Added and Modified files
-        CHANGED_FILES=$(git -C "$REPO_DIR" diff --name-only --diff-filter=AM "$OLD_COMMIT" "$NEW_COMMIT" | grep "^\.config/")
-        # 'D' catches Deleted files (this handles files that were removed or moved/renamed upstream)
-        DELETED_FILES=$(git -C "$REPO_DIR" diff --name-only --diff-filter=D "$OLD_COMMIT" "$NEW_COMMIT" | grep "^\.config/")
+        CHANGED_FILES=$(git -C "$REPO_DIR" diff --name-only --no-renames --diff-filter=AM "$OLD_COMMIT" "$NEW_COMMIT" | grep "^\.config/")
+        DELETED_FILES=$(git -C "$REPO_DIR" diff --name-only --no-renames --diff-filter=D "$OLD_COMMIT" "$NEW_COMMIT" | grep "^\.config/")
     fi
 
     if [ -n "$CHANGED_FILES" ] || [ -n "$DELETED_FILES" ]; then
@@ -1535,26 +1568,17 @@ sudo systemctl enable --now swayosd-libinput-backend.service 2>/dev/null || true
 printf "  -> SwayOSD libinput backend enabled %-14s ${C_GREEN}[ OK ]${RESET}\n" ""
 
 # --- Enable EasyEffects as a user service ---
-mkdir -p "$HOME/.config/systemd/user"
-cat <<EOF > "$HOME/.config/systemd/user/easyeffects.service"
-[Unit]
-Description=EasyEffects daemon
-PartOf=graphical-session.target
-After=graphical-session.target
-After=pipewire.service
-After=wireplumber.service
+# Remove the old custom override so systemd falls back to the official package service
+if [ -f "$HOME/.config/systemd/user/easyeffects.service" ]; then
+    systemctl --user stop easyeffects.service 2>/dev/null || true
+    rm -f "$HOME/.config/systemd/user/easyeffects.service"
+    systemctl --user daemon-reload 2>/dev/null || true
+fi
 
-[Service]
-ExecStart=/usr/bin/easyeffects --service-mode
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=graphical-session.target
-EOF
-systemctl --user daemon-reload 2>/dev/null || true
+# Enable the official package-provided service
 systemctl --user enable easyeffects.service 2>/dev/null || true
 printf "  -> EasyEffects daemon service enabled %-12s ${C_GREEN}[ OK ]${RESET}\n" ""
+
 
 if [ "$INSTALL_ZSH" = true ] && command -v zsh &> /dev/null; then
     if [ -f "$HOME/.zshrc" ]; then
@@ -1829,30 +1853,99 @@ else
     ')
 fi
 
-# 4. Inject the parsed array into settings.json
+# 3.2. Parse UPSTREAM autostart.conf dynamically into a JSON array safely
+UPSTREAM_STARTUPS_CONF="$REPO_DIR/.config/hypr/config/autostart.conf"
+UPSTREAM_STARTUPS_JSON="[]"
+
+if [ -f "$UPSTREAM_STARTUPS_CONF" ]; then
+    echo -e "  -> Parsing upstream $UPSTREAM_STARTUPS_CONF into settings.json..."
+    TMP_STARTUPS=$(mktemp)
+
+    while IFS= read -r line || [ -n "$line" ]; do
+        [[ "$line" =~ ^[[:space:]]*#.*$ ]] && continue
+        [[ -z "${line// }" ]] && continue
+        [[ ! "$line" =~ ^[[:space:]]*exec-once[[:space:]]*= ]] && continue
+
+        cmd="${line#*=}"
+        cmd="${cmd#"${cmd%%[![:space:]]*}"}"
+        cmd="${cmd%"${cmd##*[![:space:]]}"}"
+
+        [[ "$cmd" == *"qs_manager.sh toggle guide"* ]] && continue
+
+        jq -c -n --arg c "$cmd" '{command: $c}' >> "$TMP_STARTUPS"
+    done < "$UPSTREAM_STARTUPS_CONF"
+
+    if [ -s "$TMP_STARTUPS" ]; then
+        UPSTREAM_STARTUPS_JSON=$(jq -s '.' "$TMP_STARTUPS")
+    fi
+    rm -f "$TMP_STARTUPS"
+else
+    echo -e "  -> \e[33mUpstream autostart.conf not found. Skipping autostart parsing.\e[0m"
+fi
+
+# 3.4. Extract LOCAL startups from the existing settings.json
+LOCAL_STARTUPS_JSON="[]"
+if [ -f "$SETTINGS_FILE" ]; then
+    LOCAL_STARTUPS_JSON=$(jq '.startup // []' "$SETTINGS_FILE" 2>/dev/null || echo "[]")
+fi
+
+# 3.5. MERGE Startups
+if [ "$OPT_OVERRIDE_STARTUPS" = true ]; then
+    # Upstream overwrites Local
+    MERGED_STARTUPS_JSON="$UPSTREAM_STARTUPS_JSON"
+else
+    # Only add missing from upstream
+    MERGED_STARTUPS_JSON=$(jq -n \
+        --argjson local "$LOCAL_STARTUPS_JSON" \
+        --argjson up "$UPSTREAM_STARTUPS_JSON" '
+        $local +
+        (
+          $up
+          | map(
+              select(
+                .command as $cmd
+                | ($local | map(.command) | index($cmd)) == null
+              )
+            )
+        )
+    ')
+fi
+
+# 4. Inject merged arrays into settings.json
 if [ -f "$SETTINGS_FILE" ]; then
     tmp_json=$(mktemp)
-    # Merge existing user fields, overwriting installer variables and the new merged keybinds array
-    if jq --arg langs "$KB_LAYOUTS" \
+
+    if jq \
+       --arg langs "$KB_LAYOUTS" \
        --arg wpdir "$WALLPAPER_DIR" \
        --arg kbopt "$KB_OPTIONS" \
        --argjson binds "$MERGED_BINDS_JSON" \
-       '.language = $langs | .wallpaperDir = $wpdir | .kbOptions = $kbopt | .keybinds = $binds' \
+       --argjson startup "$MERGED_STARTUPS_JSON" \
+       '.language = $langs
+        | .wallpaperDir = $wpdir
+        | .kbOptions = $kbopt
+        | .keybinds = $binds
+        | .startup = $startup' \
        "$SETTINGS_FILE" > "$tmp_json"; then
-       mv "$tmp_json" "$SETTINGS_FILE"
-       printf "  -> settings.json updated (merged keybinds & user fields preserved) %-3s \e[32m[ OK ]\e[0m\n" ""
+
+        mv "$tmp_json" "$SETTINGS_FILE"
+        printf "  -> settings.json updated (merged keybinds + startup, user fields preserved) %-3s \e[32m[ OK ]\e[0m\n" ""
+
     else
-       echo -e "  -> \e[31mFailed to update settings.json. Continuing...\e[0m"
-       rm -f "$tmp_json"
+        echo -e "  -> \e[31mFailed to update settings.json. Continuing...\e[0m"
+        rm -f "$tmp_json"
     fi
+
 else
-    # File does not exist yet (or was deleted by the user) — generate the full default structure dynamically
+    # Missing / deleted settings.json → rebuild clean default structure
     mkdir -p "$(dirname "$SETTINGS_FILE")"
+
     if jq -n \
        --arg langs "$KB_LAYOUTS" \
        --arg wpdir "$WALLPAPER_DIR" \
        --arg kbopt "$KB_OPTIONS" \
        --argjson binds "$MERGED_BINDS_JSON" \
+       --argjson startup "$MERGED_STARTUPS_JSON" \
        '{
          uiScale: 1.0,
          openGuideAtStartup: true,
@@ -1861,11 +1954,14 @@ else
          language: $langs,
          kbOptions: $kbopt,
          keybinds: $binds,
+         startup: $startup,
          monitors: []
        }' > "$SETTINGS_FILE"; then
-       printf "  -> settings.json rebuilt from scratch with upstream keybinds %-13s \e[32m[ OK ]\e[0m\n" ""
+
+        printf "  -> settings.json rebuilt from scratch with upstream keybinds + startup %-4s \e[32m[ OK ]\e[0m\n" ""
+
     else
-       echo -e "  -> \e[31mFailed to create settings.json. Check syntax.\e[0m"
+        echo -e "  -> \e[31mFailed to create settings.json. Check syntax.\e[0m"
     fi
 fi
 
