@@ -3,7 +3,7 @@
 # ==============================================================================
 # Script Versioning & Initialization
 # ==============================================================================
-DOTS_VERSION="1.7.0-1"
+DOTS_VERSION="1.7.0-2"
 VERSION_FILE="$HOME/.local/state/imperative-dots-version"
 
 # ==============================================================================
@@ -1568,26 +1568,17 @@ sudo systemctl enable --now swayosd-libinput-backend.service 2>/dev/null || true
 printf "  -> SwayOSD libinput backend enabled %-14s ${C_GREEN}[ OK ]${RESET}\n" ""
 
 # --- Enable EasyEffects as a user service ---
-mkdir -p "$HOME/.config/systemd/user"
-cat <<EOF > "$HOME/.config/systemd/user/easyeffects.service"
-[Unit]
-Description=EasyEffects daemon
-PartOf=graphical-session.target
-After=graphical-session.target
-After=pipewire.service
-After=wireplumber.service
+# Remove the old custom override so systemd falls back to the official package service
+if [ -f "$HOME/.config/systemd/user/easyeffects.service" ]; then
+    systemctl --user stop easyeffects.service 2>/dev/null || true
+    rm -f "$HOME/.config/systemd/user/easyeffects.service"
+    systemctl --user daemon-reload 2>/dev/null || true
+fi
 
-[Service]
-ExecStart=/usr/bin/easyeffects --service-mode
-Restart=on-failure
-RestartSec=5
-
-[Install]
-WantedBy=graphical-session.target
-EOF
-systemctl --user daemon-reload 2>/dev/null || true
+# Enable the official package-provided service
 systemctl --user enable easyeffects.service 2>/dev/null || true
 printf "  -> EasyEffects daemon service enabled %-12s ${C_GREEN}[ OK ]${RESET}\n" ""
+
 
 if [ "$INSTALL_ZSH" = true ] && command -v zsh &> /dev/null; then
     if [ -f "$HOME/.zshrc" ]; then
